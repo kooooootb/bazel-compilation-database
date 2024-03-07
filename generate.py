@@ -86,7 +86,7 @@ if __name__ == "__main__":
     query_cmd.extend(['--noshow_progress', '--noshow_loading_progress', '--output=label'])
     query_cmd.append(query)
 
-    targets_file = tempfile.NamedTemporaryFile()
+    targets_file = tempfile.NamedTemporaryFile(delete=False)
     subprocess.check_call(query_cmd, stdout=targets_file)
 
     # Clean any previously generated files.
@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
     build_args = [
         '--override_repository=bazel_compdb={}'.format(aspects_dir),
-        '--aspects=@bazel_compdb//:aspects.bzl%compilation_database_aspect',
+        '--aspects=@@bazel_compdb//:aspects.bzl%compilation_database_aspect',
         '--noshow_progress',
         '--noshow_loading_progress',
         '--output_groups={}'.format(_OUTPUT_GROUPS),
@@ -104,9 +104,15 @@ if __name__ == "__main__":
     build_cmd = [_BAZEL, 'build']
     build_cmd.extend(build_args)
     build_cmd.extend(user_build_args)
+
+    # close temp file to make it available for subprocess
+    targets_file_name = targets_file.name
+    targets_file.close()
+
     subprocess.check_call(build_cmd, stdout=subprocess.DEVNULL)
 
-    targets_file.close()
+    # delete temp file manually
+    os.unlink(targets_file_name)
 
     db_entries = []
     for db in pathlib.Path(bazel_exec_root).glob('**/*.compile_commands.json'):
